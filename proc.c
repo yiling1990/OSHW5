@@ -166,6 +166,7 @@ fork(void)
     return -1;
 
   // Copy process state from p.
+  
   if(!(np->pgdir = copyuvm(proc->pgdir, proc->sz))){
     kfree(np->kstack);
     np->kstack = 0;
