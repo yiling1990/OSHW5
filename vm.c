@@ -321,3 +321,36 @@ bad:
   return 0;
 }
 
+
+// Given a parent process's page table, make a copy of it in order
+// to share the data with the child.
+pde_t*
+shareuvm(pde_t *pgdir, uint sz)
+{
+  pde_t *d = setupkvm();
+  pte_t *pte;
+  uint pa, i;
+  //char *mem;
+
+  if(!d) return 0;
+  for(i = 0; i < sz; i += PGSIZE){
+    if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
+      panic("copyuvm: pte should exist\n");
+    if(!(*pte & PTE_P))
+      panic("copyuvm: page not present\n");
+    pa = PTE_ADDR(*pte);
+    /*
+    if(!(mem = kalloc()))
+      goto bad;
+    memmove(mem, (char *)pa, PGSIZE);
+    */
+    if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_W|PTE_U|PTE_S))
+      goto bad;
+  }
+  return d;
+
+bad:
+  freevm(d);
+  return 0;
+}
+
