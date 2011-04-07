@@ -158,6 +158,7 @@ growproc(int n)
 int
 fork(void)
 {
+	cprintf("proc %d is forking new proc\n", proc->pid);
   int i, pid;
   struct proc *np;
 
@@ -166,13 +167,17 @@ fork(void)
     return -1;
 
   // Copy process state from p.
-  
-  if(!(np->pgdir = copyuvm(proc->pgdir, proc->sz))){
+  //Don't copy the page table. Instead mark pages as shared, then copy-on-write
+  if(!(np->pgdir = shareuvm(proc->pgdir, proc->sz)))
+	//if (!(np->pgdir = copyuvm(proc->pgdir, proc->sz)))
+	{
+
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
   }
+  
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
@@ -188,6 +193,8 @@ fork(void)
   pid = np->pid;
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
+
+	cprintf("proc %d is forking proc %d\n", proc->pid, pid);
   return pid;
 }
 

@@ -8,6 +8,10 @@
 
 #define USERTOP  0xA0000
 
+//extern pte_t* walkpgdir(pde_t *pgdir, const void *va, int create);
+//extern int mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm);
+
+
 static pde_t *kpgdir;  // for use in scheduler()
 
 // Set up CPU's kernel segment descriptors.
@@ -49,11 +53,15 @@ walkpgdir(pde_t *pgdir, const void *va, int create)
   pte_t *pgtab;
 
   pde = &pgdir[PDX(va)];
-  if(*pde & PTE_P){
+	//*pde = *pde & ~PTE_W;
+  if(*pde & PTE_P)
+	{
     pgtab = (pte_t*) PTE_ADDR(*pde);
-  } else if(!create || !(r = (uint) kalloc()))
+  } 
+	else if(!create || !(r = (uint) kalloc()))
     return 0;
-  else {
+  else 
+	{
     pgtab = (pte_t*) r;
     // Make sure all those PTE_P bits are zero.
     memset(pgtab, 0, PGSIZE);
@@ -61,6 +69,7 @@ walkpgdir(pde_t *pgdir, const void *va, int create)
     // be further restricted by the permissions in the page table 
     // entries, if necessary.
     *pde = PADDR(r) | PTE_P | PTE_W | PTE_U;
+    //*pde = PADDR(r) | PTE_P | PTE_U;
   }
   return &pgtab[PTX(va)];
 }
@@ -302,7 +311,8 @@ copyuvm(pde_t *pgdir, uint sz)
   char *mem;
 
   if(!d) return 0;
-  for(i = 0; i < sz; i += PGSIZE){
+  for(i = 0; i < sz; i += PGSIZE)
+	{
     if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
       panic("copyuvm: pte should exist\n");
     if(!(*pte & PTE_P))
@@ -313,6 +323,42 @@ copyuvm(pde_t *pgdir, uint sz)
     memmove(mem, (char *)pa, PGSIZE);
     if(!mappages(d, (void *)i, PGSIZE, PADDR(mem), PTE_W|PTE_U))
       goto bad;
+  }
+  return d;
+
+bad:
+  freevm(d);
+  return 0;
+}
+
+
+// Given a parent process's page table, make a copy of it in order
+// to share the data with the child.
+pde_t*
+shareuvm(pde_t *pgdir, uint sz)
+{
+  pde_t *d = setupkvm();
+  pte_t *pte;
+  uint pa, i;
+  //char *mem;
+
+  if(!d) return 0;
+  for(i = 0; i < sz; i += PGSIZE)
+	{
+    if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
+      panic("shareuvm: pte should exist\n");
+    if(!(*pte & PTE_P))
+      panic("shareuvm: page not present\n");
+    pa = PTE_ADDR(*pte);
+		pa = PADDR(pa);
+    /*
+    if(!(mem = kalloc()))
+      goto bad;
+    memmove(mem, (char *)pa, PGSIZE);
+    */
+    //if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_W|PTE_U|PTE_S))
+    if(!mappages(d, (void *)i, PGSIZE, pa, PTE_U))
+			goto bad;
   }
   return d;
 
