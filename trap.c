@@ -89,7 +89,8 @@ idtinit(void)
 void
 trap(struct trapframe *tf)
 {
-  if(tf->trapno == T_SYSCALL){
+  if(tf->trapno == T_SYSCALL)
+	{
     if(proc->killed)
       exit();
     proc->tf = tf;
@@ -99,7 +100,8 @@ trap(struct trapframe *tf)
     return;
   }
 
-  switch(tf->trapno){
+  switch(tf->trapno)
+	{
   case T_IRQ0 + IRQ_TIMER:
     if(cpu->id == 0){
       acquire(&tickslock);
@@ -129,6 +131,7 @@ trap(struct trapframe *tf)
     break;
 	
 	case T_PGFLT:
+		cprintf("cr2: %d\n", rcr2());
 		if (!((uint)rcr2() & PTE_W))
 		{
 			cprintf("procid: %d\n", proc->pid);
@@ -140,6 +143,8 @@ trap(struct trapframe *tf)
 	
 			if(!(pte = walkpgdir(proc->pgdir, (void *)rcr2(), 0)))
 				panic("pte should exist\n");
+
+			cprintf("PTE: %d\n", pte);
 			if(!(*pte & PTE_P))
 				panic("page not present\n");
 			pa = PTE_ADDR(*pte);
@@ -148,8 +153,8 @@ trap(struct trapframe *tf)
 			memmove(mem, (char *)pa, PGSIZE);
 			if(!mappages(proc->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W | PTE_U))
 					panic("mappages fail\n");
+
 		}
-		/*
 		else
 		{
 				if(proc == 0 || (tf->cs&3) == 0){
@@ -165,7 +170,6 @@ trap(struct trapframe *tf)
 								rcr2());
 				proc->killed = 1;
 		}
-		*/
 		break;
 
   default:

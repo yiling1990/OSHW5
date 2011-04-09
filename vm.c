@@ -88,7 +88,10 @@ mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm)
     if(pte == 0)
       return 0;
     if(*pte & PTE_P)
+		{
       panic("remap");
+			//continue;
+		}
     *pte = pa | perm | PTE_P;
     if(a == last)
       break;
@@ -350,14 +353,14 @@ shareuvm(pde_t *pgdir, uint sz)
     if(!(*pte & PTE_P))
       panic("shareuvm: page not present\n");
     pa = PTE_ADDR(*pte);
-		pa = PADDR(pa);
+		//pa = PADDR(pa);
     /*
     if(!(mem = kalloc()))
       goto bad;
     memmove(mem, (char *)pa, PGSIZE);
     */
     //if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_W|PTE_U|PTE_S))
-    if(!mappages(d, (void *)i, PGSIZE, pa, PTE_U))
+    if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_U))
 			goto bad;
   }
   return d;
