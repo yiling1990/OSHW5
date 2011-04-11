@@ -5,11 +5,12 @@
 #include "hw5-common.h"
 
 int main() {
-/*
+
   int pid;
   int ppid = getpid();
 
   pid = fork();
+  printf(stdout, "pid %d\n", pid);
   if (pid < 0)
     panic("fork");
   if (pid == 0) {
@@ -58,7 +59,7 @@ int main() {
   }
   if (wait() < 0)
     panic("wait");
-*/
+
   printf(stdout, "hw5-test-error succeeded\n");
   exit();
 }

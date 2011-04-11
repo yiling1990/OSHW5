@@ -202,7 +202,7 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 	
 	lcr3(rcr3());
-	
+
   return pid;
 }
 
@@ -273,6 +273,7 @@ wait(void)
         freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
+
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
