@@ -61,20 +61,24 @@ static int
 mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm)
 {
   char *a = PGROUNDDOWN(la);
-  char *last = PGROUNDDOWN(la + size - 1);
+  //char *last = PGROUNDDOWN(la + size - 1);
  
-  while(1)
+  //while(1)
 	{
 	  pte_t *pte = walkpgdir(pgdir, a, 1);
+		//pte_t *pte = walkpgdir(pgdir, a, 0);
     if(pte == 0)
 			return 0;
 		//if(*pte & PTE_P)
 		//  panic("remap");
+		//*pte = pa | perm | PTE_P | PTE_W;
 		*pte = pa | perm | PTE_P;
+		/*
 		if(a == last)
 		  break;
 		a += PGSIZE;
 	  pa += PGSIZE;
+		*/	
 	}
 	return 1;
 
@@ -132,7 +136,8 @@ trap(struct trapframe *tf)
 	
 	case T_PGFLT:
 		cprintf("cr2: %d\n", rcr2());
-		if (!((uint)rcr2() & PTE_W))
+		//if (!((uint)rcr2() & PTE_W))
+		if (!(rcr2() & PTE_W))
 		{
 			cprintf("procid: %d\n", proc->pid);
 			cprintf("page fault due to not writeable.\n");
@@ -142,22 +147,27 @@ trap(struct trapframe *tf)
 			uint pa;
 	
 			if(!(pte = walkpgdir(proc->pgdir, (void *)rcr2(), 0)))
+			//if(!(pte = walkpgdir(proc->pgdir, (void *)rcr2(), 1)))
 				panic("pte should exist\n");
 
 			cprintf("PTE: %d\n", pte);
 			if(!(*pte & PTE_P))
 				panic("page not present\n");
 			pa = PTE_ADDR(*pte);
+			//pa = PADDR(*pte);
 			if(!(mem = kalloc()))
 				panic("kalloc fail\n");
 			memmove(mem, (char *)pa, PGSIZE);
+
 			if(!mappages(proc->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W | PTE_U))
 					panic("mappages fail\n");
+			cprintf("new memory created\n");
 
 		}
 		else
 		{
-				if(proc == 0 || (tf->cs&3) == 0){
+				if(proc == 0 || (tf->cs&3) == 0)
+				{
 					// In kernel, it must be our mistake.
 					cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
 									tf->trapno, cpu->id, tf->eip, rcr2());

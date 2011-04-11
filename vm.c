@@ -57,18 +57,72 @@ walkpgdir(pde_t *pgdir, const void *va, int create)
   if(*pde & PTE_P)
 	{
     pgtab = (pte_t*) PTE_ADDR(*pde);
+		//cprintf("walk1\n");
   } 
 	else if(!create || !(r = (uint) kalloc()))
+	{
+		cprintf("walk2\n");
     return 0;
+	}
   else 
 	{
-    pgtab = (pte_t*) r;
+		pgtab = (pte_t*) r;
+    //pgtab = (pte_t*) (r & PTE_MBZ);
     // Make sure all those PTE_P bits are zero.
     memset(pgtab, 0, PGSIZE);
+
     // The permissions here are overly generous, but they can
     // be further restricted by the permissions in the page table 
     // entries, if necessary.
-    *pde = PADDR(r) | PTE_P | PTE_W | PTE_U;
+		
+    *pde = PADDR(r) | PTE_P | PTE_W | PTE_U; //PTE_W is set here so the page directory is still writeable
+
+		//*pde = PADDR(r) | PTE_P | PTE_U;
+
+		cprintf("walk3\n");
+    //*pde = PADDR(r) | PTE_P | PTE_U;
+  }
+  return &pgtab[PTX(va)];
+}
+
+// Return the address of the PTE in page table pgdir
+// that corresponds to linear address va.  If create!=0,
+// create any required page table pages.
+static pte_t *
+walkpgdir2(pde_t *pgdir, const void *va, int create)
+{
+  uint r;
+  pde_t *pde;
+  pte_t *pgtab;
+
+  pde = &pgdir[PDX(va)];
+	//*pde = *pde & ~PTE_W;
+  if(*pde & PTE_P)
+	{
+    pgtab = (pte_t*) PTE_ADDR(*pde);
+		//cprintf("walk1\n");
+  } 
+	else if(!create || !(r = (uint) kalloc()))
+	{
+		cprintf("walk2\n");
+    return 0;
+	}
+  else 
+	{
+		//pgtab = (pte_t*) r;
+    pgtab = (pte_t*) (r & PTE_MBZ);
+    // Make sure all those PTE_P bits are zero.
+    memset(pgtab, 0, PGSIZE);
+
+    // The permissions here are overly generous, but they can
+    // be further restricted by the permissions in the page table 
+    // entries, if necessary.
+		
+    *pde = PADDR(r) | PTE_P | PTE_W | PTE_U; //PTE_W is set here so the page directory is still writeable
+
+		//*pde = PADDR(r) | PTE_P | PTE_U;
+
+		cprintf("walk3\n");
     //*pde = PADDR(r) | PTE_P | PTE_U;
   }
   return &pgtab[PTX(va)];
@@ -83,12 +137,45 @@ mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm)
   char *a = PGROUNDDOWN(la);
   char *last = PGROUNDDOWN(la + size - 1);
 
-  while(1){
+  while(1)
+	{
     pte_t *pte = walkpgdir(pgdir, a, 1);
+    //pte_t *pte = walkpgdir(pgdir, a, 0);
     if(pte == 0)
       return 0;
     if(*pte & PTE_P)
 		{
+			//*pte = *pte | ~PTE_P;
+      panic("remap");
+			//continue;
+		}
+    *pte = pa | perm | PTE_P;
+    if(a == last)
+      break;
+    a += PGSIZE;
+    pa += PGSIZE;
+  }
+  return 1;
+}
+
+// Create PTEs for linear addresses starting at la that refer to
+// physical addresses starting at pa. la and size might not
+// be page-aligned.
+static int
+mappages2(pde_t *pgdir, void *la, uint size, uint pa, int perm)
+{
+  char *a = PGROUNDDOWN(la);
+  char *last = PGROUNDDOWN(la + size - 1);
+
+  while(1)
+	{
+    pte_t *pte = walkpgdir2(pgdir, a, 1);
+    //pte_t *pte = walkpgdir(pgdir, a, 0);
+    if(pte == 0)
+      return 0;
+    if(*pte & PTE_P)
+		{
+			//*pte = *pte | ~PTE_P;
       panic("remap");
 			//continue;
 		}
@@ -214,7 +301,9 @@ inituvm(pde_t *pgdir, char *init, uint sz)
   if (sz >= PGSIZE)
     panic("inituvm: more than a page");
   memset(mem, 0, PGSIZE);
-  mappages(pgdir, 0, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+  //mappages(pgdir, 0, PGSIZE, PADDR(mem), PTE_W|PTE_U);
+	mappages(pgdir, 0, PGSIZE, PADDR(mem), PTE_U);
+
   memmove(mem, init, sz);
 }
 
@@ -228,7 +317,8 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
 
   if((uint)addr % PGSIZE != 0)
     panic("loaduvm: addr must be page aligned\n");
-  for(i = 0; i < sz; i += PGSIZE){
+  for(i = 0; i < sz; i += PGSIZE)
+	{
     if(!(pte = walkpgdir(pgdir, addr+i, 0)))
       panic("loaduvm: address should exist\n");
     pa = PTE_ADDR(*pte);
@@ -296,7 +386,8 @@ freevm(pde_t *pgdir)
   if(!pgdir)
     panic("freevm: no pgdir");
   deallocuvm(pgdir, USERTOP, 0);
-  for(i = 0; i < NPDENTRIES; i++){
+  for(i = 0; i < NPDENTRIES; i++)
+	{
     if(pgdir[i] & PTE_P)
       kfree((void *) PTE_ADDR(pgdir[i]));
   }
@@ -343,16 +434,20 @@ shareuvm(pde_t *pgdir, uint sz)
   pde_t *d = setupkvm();
   pte_t *pte;
   uint pa, i;
-  //char *mem;
+  char *mem;
+
+	cprintf("share1\n");
 
   if(!d) return 0;
   for(i = 0; i < sz; i += PGSIZE)
 	{
-    if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
+    if(!(pte = walkpgdir2(pgdir, (void *)i, 0)))
       panic("shareuvm: pte should exist\n");
     if(!(*pte & PTE_P))
       panic("shareuvm: page not present\n");
-    pa = PTE_ADDR(*pte);
+
+    pa = PTE_ADDR(*pte); //& 0xFFFFFFFD;
+		mem = (char *) pa;
 		//pa = PADDR(pa);
     /*
     if(!(mem = kalloc()))
@@ -360,7 +455,7 @@ shareuvm(pde_t *pgdir, uint sz)
     memmove(mem, (char *)pa, PGSIZE);
     */
     //if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_W|PTE_U|PTE_S))
-    if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_U))
+    if(!mappages2(d, (void *)i, PGSIZE, PADDR(mem), PTE_U))
 			goto bad;
   }
   return d;
