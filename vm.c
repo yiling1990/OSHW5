@@ -238,7 +238,6 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
 int
 allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 {
-  //cprintf("allocuvm\n"); 
   if(newsz > USERTOP)
     return 0;
   char *a = (char *)PGROUNDUP(oldsz);
@@ -263,7 +262,6 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 int
 deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 {
-  //cprintf("deallocuvm\n");
   char *a = (char *)PGROUNDUP(newsz);
   char *last = PGROUNDDOWN(oldsz - 1);
   for(; a <= last; a += PGSIZE){
@@ -340,19 +338,14 @@ shareuvm(pde_t *pgdir, uint sz)
   if(!d) return 0;
   for(i = 0; i < sz; i += PGSIZE){
     if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
-      panic("copyuvm: pte should exist\n");
+      panic("shareuvm: pte should exist\n");
     if(!(*pte & PTE_P))
-      panic("copyuvm: page not present\n");
+      panic("shareuvm: page not present\n");
     
     *pte = *pte & ~PTE_W;
+    
     pa = PTE_ADDR(*pte);
 
-   // cprintf("physical address: %d\n", pa);
-    /*
-    if(!(mem = kalloc()))
-      goto bad;
-    memmove(mem, (char *)pa, PGSIZE);
-    */
     if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_U))
       goto bad;
   }

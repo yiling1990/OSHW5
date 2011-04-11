@@ -23,7 +23,6 @@ tvinit(void)
   for(i = 0; i < 256; i++)
     SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
   	SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
-		//SETGATE(idt[T_PGFLT], 1, SEG_KCODE<<3, vectors[T_PGFLT], DPL_KERNEL);
   
   	initlock(&tickslock, "time");
 }
@@ -55,7 +54,7 @@ trap(struct trapframe *tf)
 			handlepagefault(proc);   
     	if(proc->killed)
       	exit();
-      cprintf("Page Fault Successfully Handled\n");
+      //cprintf("Page Fault Successfully Handled\n");
     }
     else {
      cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",

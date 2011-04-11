@@ -177,7 +177,7 @@ fork(void)
   }
   */
   //Don't copy the page table. Instead mark pages as shared, then copy-on-write
-  cprintf("fork\n");
+  //cprintf("fork\n");
   if(!(np->pgdir = shareuvm(proc->pgdir, proc->sz))){
     kfree(np->kstack);
     np->kstack = 0;
@@ -201,7 +201,8 @@ fork(void)
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 	
-	lcr3(rcr3());	
+	lcr3(rcr3());
+	
   return pid;
 }
 
@@ -211,7 +212,6 @@ fork(void)
 void
 exit(void)
 {
-  //cprintf("Exit Called\n");
   struct proc *p;
   int fd;
 
@@ -254,7 +254,6 @@ exit(void)
 int
 wait(void)
 {
-  //cprintf("Wait Called\n");
   struct proc *p;
   int havekids, pid;
 
@@ -357,7 +356,6 @@ sched(void)
 void
 yield(void)
 {
-  //cprintf("Yield Called\n");
   acquire(&ptable.lock);  //DOC: yieldlock
   proc->state = RUNNABLE;
   sched();
@@ -380,7 +378,6 @@ forkret(void)
 void
 sleep(void *chan, struct spinlock *lk)
 {
-  //cprintf("Sleep Called\n");
   if(proc == 0)
     panic("sleep");
 
@@ -482,11 +479,11 @@ handlepagefault(struct proc* p)
     uint pa;
     char *mem;
 
-    cprintf("PID Causing Fault: %d\n", p->pid);
+    //cprintf("PID Causing Fault: %d\n", p->pid);
     if(!(pte = walkpgdir(p->pgdir, (void *)rcr2(), 0)))
       panic("page fault handler: pte should exist\n");
     
-    cprintf("pte : %d\n", pte);  
+    //cprintf("pte : %d\n", pte);  
     
     //if(!(*pte & PTE_P))
     //  panic("page fault handler: page not present\n");
@@ -496,20 +493,12 @@ handlepagefault(struct proc* p)
     if(!(mem = kalloc()))
       panic ("no alloc");
       
-    //memset(mem, 0, PGSIZE);
+
     memmove(mem, (char *)pa, PGSIZE);
 
     if(!mappages(p->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W|PTE_U))
       panic("no mapping");
     
-    /* 
-    proc = p;
-    switchuvm(p);
-    p->state = RUNNING;
-    swtch(&cpu->scheduler, p->context);
-    switchkvm();
-    */
-    //lcr3(rcr3()); 
     return p;
  }
 
@@ -527,9 +516,7 @@ wakeup(void *chan)
 // to user space (see trap in trap.c).
 int
 kill(int pid)
-{
-  //cprintf("Kill Called\n");
-  
+{ 
   struct proc *p;
 
   acquire(&ptable.lock);
