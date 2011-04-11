@@ -138,7 +138,7 @@ struct segdesc {
 // Address in page table or page directory entry
 #define PTE_ADDR(pte)	((uint) (pte) & ~0xFFF)
 
-typedef uint pte_t;
+//typedef uint pte_t;
 
 // Task state segment format
 struct taskstate {

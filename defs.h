@@ -106,6 +106,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+struct proc*    handlepagefault(struct proc*);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -165,6 +166,7 @@ pde_t*          copyuvm(pde_t*,uint);
 pde_t*          shareuvm(pde_t*,uint);
 void            switchuvm(struct proc*);
 void            switchkvm();
+//int             mappages(pde_t*, void*, uint, uint, int);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

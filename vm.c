@@ -8,10 +8,6 @@
 
 #define USERTOP  0xA0000
 
-//extern pte_t* walkpgdir(pde_t *pgdir, const void *va, int create);
-//extern int mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm);
-
-
 static pde_t *kpgdir;  // for use in scheduler()
 
 // Set up CPU's kernel segment descriptors.
@@ -53,15 +49,12 @@ walkpgdir(pde_t *pgdir, const void *va, int create)
   pte_t *pgtab;
 
   pde = &pgdir[PDX(va)];
-	//*pde = *pde & ~PTE_W;
-  if(*pde & PTE_P)
-	{
+  if(*pde & PTE_P){
     pgtab = (pte_t*) PTE_ADDR(*pde);
   } 
-	else if(!create || !(r = (uint) kalloc()))
+  else if(!create || !(r = (uint) kalloc()))
     return 0;
-  else 
-	{
+  else {
     pgtab = (pte_t*) r;
     // Make sure all those PTE_P bits are zero.
     memset(pgtab, 0, PGSIZE);
@@ -69,8 +62,8 @@ walkpgdir(pde_t *pgdir, const void *va, int create)
     // be further restricted by the permissions in the page table 
     // entries, if necessary.
     *pde = PADDR(r) | PTE_P | PTE_W | PTE_U;
-    //*pde = PADDR(r) | PTE_P | PTE_U;
   }
+  
   return &pgtab[PTX(va)];
 }
 
@@ -85,13 +78,11 @@ mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm)
 
   while(1){
     pte_t *pte = walkpgdir(pgdir, a, 1);
+    
     if(pte == 0)
       return 0;
     if(*pte & PTE_P)
-		{
       panic("remap");
-			//continue;
-		}
     *pte = pa | perm | PTE_P;
     if(a == last)
       break;
@@ -247,6 +238,7 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
 int
 allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 {
+  //cprintf("allocuvm\n"); 
   if(newsz > USERTOP)
     return 0;
   char *a = (char *)PGROUNDUP(oldsz);
@@ -271,6 +263,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 int
 deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 {
+  //cprintf("deallocuvm\n");
   char *a = (char *)PGROUNDUP(newsz);
   char *last = PGROUNDDOWN(oldsz - 1);
   for(; a <= last; a += PGSIZE){
@@ -279,7 +272,7 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       uint pa = PTE_ADDR(*pte);
       if(pa == 0)
         panic("kfree");
-      kfree((void *) pa);
+      //kfree((void *) pa);
       *pte = 0;
     }
   }
@@ -314,8 +307,7 @@ copyuvm(pde_t *pgdir, uint sz)
   char *mem;
 
   if(!d) return 0;
-  for(i = 0; i < sz; i += PGSIZE)
-	{
+  for(i = 0; i < sz; i += PGSIZE){
     if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
       panic("copyuvm: pte should exist\n");
     if(!(*pte & PTE_P))
@@ -346,22 +338,23 @@ shareuvm(pde_t *pgdir, uint sz)
   //char *mem;
 
   if(!d) return 0;
-  for(i = 0; i < sz; i += PGSIZE)
-	{
+  for(i = 0; i < sz; i += PGSIZE){
     if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
-      panic("shareuvm: pte should exist\n");
+      panic("copyuvm: pte should exist\n");
     if(!(*pte & PTE_P))
-      panic("shareuvm: page not present\n");
+      panic("copyuvm: page not present\n");
+    
+    *pte = *pte & ~PTE_W;
     pa = PTE_ADDR(*pte);
-		//pa = PADDR(pa);
+
+   // cprintf("physical address: %d\n", pa);
     /*
     if(!(mem = kalloc()))
       goto bad;
     memmove(mem, (char *)pa, PGSIZE);
     */
-    //if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_W|PTE_U|PTE_S))
     if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_U))
-			goto bad;
+      goto bad;
   }
   return d;
 

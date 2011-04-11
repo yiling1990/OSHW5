@@ -68,6 +68,7 @@ procdump(void)
 static struct proc*
 allocproc(void)
 {
+  //cprintf("Allocproc Called\n");
   struct proc *p;
   char *sp;
 
@@ -139,6 +140,7 @@ userinit(void)
 int
 growproc(int n)
 {
+  //cprintf("GrowProc Called\n");
   uint sz = proc->sz;
   if(n > 0){
     if(!(sz = allocuvm(proc->pgdir, sz, sz + n)))
@@ -158,7 +160,6 @@ growproc(int n)
 int
 fork(void)
 {
-	cprintf("proc %d is forking new proc\n", proc->pid);
   int i, pid;
   struct proc *np;
 
@@ -167,11 +168,17 @@ fork(void)
     return -1;
 
   // Copy process state from p.
+  /*
+  if(!(np->pgdir = copyuvm(proc->pgdir, proc->sz))){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->		proc->tf = tf;state = UNUSED;
+    return -1;
+  }
+  */
   //Don't copy the page table. Instead mark pages as shared, then copy-on-write
-  if(!(np->pgdir = shareuvm(proc->pgdir, proc->sz)))
-	//if (!(np->pgdir = copyuvm(proc->pgdir, proc->sz)))
-	{
-
+  cprintf("fork\n");
+  if(!(np->pgdir = shareuvm(proc->pgdir, proc->sz))){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
@@ -193,8 +200,8 @@ fork(void)
   pid = np->pid;
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
-
-	cprintf("proc %d is forking proc %d\n", proc->pid, pid);
+	
+	lcr3(rcr3());	
   return pid;
 }
 
@@ -204,6 +211,7 @@ fork(void)
 void
 exit(void)
 {
+  //cprintf("Exit Called\n");
   struct proc *p;
   int fd;
 
@@ -246,6 +254,7 @@ exit(void)
 int
 wait(void)
 {
+  //cprintf("Wait Called\n");
   struct proc *p;
   int havekids, pid;
 
@@ -348,6 +357,7 @@ sched(void)
 void
 yield(void)
 {
+  //cprintf("Yield Called\n");
   acquire(&ptable.lock);  //DOC: yieldlock
   proc->state = RUNNABLE;
   sched();
@@ -370,6 +380,7 @@ forkret(void)
 void
 sleep(void *chan, struct spinlock *lk)
 {
+  //cprintf("Sleep Called\n");
   if(proc == 0)
     panic("sleep");
 
@@ -414,6 +425,94 @@ wakeup1(void *chan)
       p->state = RUNNABLE;
 }
 
+pte_t *
+walkpgdir(pde_t *pgdir, const void *va, int create)
+{
+  uint r;
+  pde_t *pde;
+  pte_t *pgtab;
+
+  pde = &pgdir[PDX(va)];
+  if(*pde & PTE_P){
+    pgtab = (pte_t*) PTE_ADDR(*pde);
+  } 
+  else if(!create || !(r = (uint) kalloc()))
+    return 0;
+  else {
+    pgtab = (pte_t*) r;
+    // Make sure all those PTE_P bits are zero.
+    memset(pgtab, 0, PGSIZE);
+    // The permissions here are overly generous, but they can
+    // be further restricted by the permissions in the page table 
+    // entries, if necessary.
+    *pde = PADDR(r) | PTE_P | PTE_W | PTE_U;
+  }
+  return &pgtab[PTX(va)];
+}
+
+// Create PTEs for linear addresses starting at la that refer to
+// physical addresses starting at pa. la and size might not
+// be page-aligned.
+int
+mappages(pde_t *pgdir, void *la, uint size, uint pa, int perm)
+{
+  char *a = PGROUNDDOWN(la);
+ // char *last = PGROUNDDOWN(la + size - 1);
+
+  //while(1){
+    pte_t *pte = walkpgdir(pgdir, a, 1);
+    if(pte == 0)
+      return 0;
+   // if(*pte & PTE_P)
+   //   panic("remap");
+    *pte = pa | perm | PTE_P;
+    //if(a == last)
+    //  break;
+   // a += PGSIZE;
+  //  pa += PGSIZE;
+  //}
+  return 1;
+}
+
+// Page Fault Handler
+struct proc*
+handlepagefault(struct proc* p)
+{
+    pte_t *pte;
+    uint pa;
+    char *mem;
+
+    cprintf("PID Causing Fault: %d\n", p->pid);
+    if(!(pte = walkpgdir(p->pgdir, (void *)rcr2(), 0)))
+      panic("page fault handler: pte should exist\n");
+    
+    cprintf("pte : %d\n", pte);  
+    
+    //if(!(*pte & PTE_P))
+    //  panic("page fault handler: page not present\n");
+      
+    pa = PTE_ADDR(*pte);
+
+    if(!(mem = kalloc()))
+      panic ("no alloc");
+      
+    //memset(mem, 0, PGSIZE);
+    memmove(mem, (char *)pa, PGSIZE);
+
+    if(!mappages(p->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W|PTE_U))
+      panic("no mapping");
+    
+    /* 
+    proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+    swtch(&cpu->scheduler, p->context);
+    switchkvm();
+    */
+    //lcr3(rcr3()); 
+    return p;
+ }
+
 // Wake up all processes sleeping on chan.
 void
 wakeup(void *chan)
@@ -429,6 +528,8 @@ wakeup(void *chan)
 int
 kill(int pid)
 {
+  //cprintf("Kill Called\n");
+  
   struct proc *p;
 
   acquire(&ptable.lock);
