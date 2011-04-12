@@ -107,7 +107,7 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 struct proc*    handlepagefault(struct proc*);
-void            refincr(pte_t *);
+void            refincr(uint);
 // swtch.S
 void            swtch(struct context**, struct context*);
 

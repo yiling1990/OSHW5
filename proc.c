@@ -12,7 +12,7 @@ struct {
 } ptable;
 
 struct refcount {
-  pte_t *pte;
+  uint pa;
   int count;
   struct refcount *next;
 };
@@ -30,11 +30,11 @@ refcountinit(void)
 
 //Allocate a refcount structure
 void 
-refcountalloc(pte_t *pte)
+refcountalloc(uint pa)
 {
   cprintf("calling refcount alloc\n");
   struct refcount *r= (struct refcount*)kalloc();
-  r->pte = pte;
+  r->pa = pa;
   r->count = 1;
   r->next = (void *)0;
  
@@ -50,11 +50,11 @@ refcountalloc(pte_t *pte)
   cprintf("finsihed allocing refcount\n");
 }
 
-// Get refcount for pte
+// Get refcount for pa
 struct refcount *
-getRefCount(pte_t * pte){
+getRefCount(uint pa ){
   struct refcount *current = rftable.first;
-  while(current != (void *)0 && current->pte != pte)
+  while(current != (void *)0 && current->pa != pa)
     current = current->next;
   if(current == (void *)0)
     return 0;    
@@ -79,15 +79,15 @@ remove(struct refcount *r){
  
 // Increment ref count
 void
-refincr(pte_t *pte)
+refincr(uint pa)
 {
   cprintf("increasing refcount\n");
   acquire(&rftable.lock);
   struct refcount *r;
-  if(!(r = getRefCount(pte)))
+  if(!(r = getRefCount(pa)))
   {
-    refcountalloc(pte); 
-    r = getRefCount(pte);
+    refcountalloc(pa); 
+    r = getRefCount(pa);
   }
   r->count++;    
   release(&rftable.lock);
@@ -96,16 +96,16 @@ refincr(pte_t *pte)
 
 // Decrement ref count;
 void
-refdecr(pte_t *pte)
+refdecr(uint pa)
 {
   cprintf("decreasing refcount\n");
   acquire(&rftable.lock);
   struct refcount *r;
-  if(!(r = getRefCount(pte)))
+  if(!(r = getRefCount(pa)))
     panic("trying to decrement a page that isn't being counted\n");
   r->count--;
+ 
   if(r->count ==  0){
-    uint pa = PTE_ADDR(*pte);
     kfree((void *) pa);
     remove(r);  
   }   
@@ -605,10 +605,10 @@ handlepagefault(struct proc* p)
     if(!mappages(p->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W|PTE_U))
       panic("no mapping");
      
-    refdecr(pte);
+    refdecr(pa);
     char *a = PGROUNDDOWN((void *)rcr2());
     pte_t *newPTE = walkpgdir(p->pgdir, a, 1); 
-    refincr(newPTE);
+    refincr(PTE_ADDR(*newPTE));
     return p;
  }
 
