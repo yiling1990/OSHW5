@@ -108,6 +108,8 @@ void            wakeup(void*);
 void            yield(void);
 struct proc*    handlepagefault(struct proc*);
 void            refincr(uint);
+void						refdecr(uint);
+
 // swtch.S
 void            swtch(struct context**, struct context*);
 

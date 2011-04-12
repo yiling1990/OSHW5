@@ -6,76 +6,73 @@
 #include "proc.h"
 #include "spinlock.h"
 
+#define arraySize 4096
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
 
-struct refcount {
-  uint pa;
-  int count;
-  struct refcount *next;
-};
 
 struct {
   struct spinlock lock;
-  struct refcount *first;
+  uint paList[arraySize];
+  uint refCounts[arraySize]; 
 } rftable;
 
 void
 refcountinit(void)
 {
-  initlock(&rftable.lock, "rftable");
+   initlock(&rftable.lock, "rftable");
 }
 
+
 //Allocate a refcount structure
-void 
+uint
 refcountalloc(uint pa)
 {
   //cprintf("calling refcount alloc\n");
-  struct refcount *r= (struct refcount*)kalloc();
-  r->pa = pa;
-  r->count = 1;
-  r->next = (void *)0;
- 
-  if(rftable.first != (void *)0)
-  {
-    struct refcount *current = rftable.first;
-    while(current->next != (void *)0) 
-     current = current->next;
-    current->next = r;   
-  }
-  else
-    rftable.first = r;
+	int i;
+
+	for (i=0; i<arraySize; i++)
+	{
+			if (rftable.paList[i] == 0)
+			{
+					rftable.paList[i] = pa;
+					rftable.refCounts[i] = 1;
+					return i;
+			}
+	}
+
+	panic("array is full");
+	
   //cprintf("finished allocing refcount\n");
 }
 
+
 // Get refcount for pa
-struct refcount *
-getRefCount(uint pa)
-{
-  struct refcount *current = rftable.first;
-  while(current != (void *)0 && current->pa != pa)
-    current = current->next;
-  if(current == (void *)0)
-    return 0;    
- return current; 
+uint
+getRefCount(uint pa ){
+  int i;
+  for(i=0; i<arraySize;i++){
+    if(rftable.paList[i] == pa)
+      return i;
+  }  
+return 0;
 }
+
 
 // remove refcount from list
 void
-remove(struct refcount *r){
-  struct refcount *current = rftable.first;
-  struct refcount *prev = (void *)0;
-  while(current != r){
-    prev = current;
-    current = current->next;
-  }
-  if(prev == (void *)0)
-    rftable.first = current->next;
-  else
-    prev->next = current->next;  
-  kfree((void *)current);
+remove(uint pa){
+  int i;
+  for(i=0; i<arraySize;i++){
+    if(rftable.paList[i] == pa)
+    { 
+      rftable.paList[i] = 0;
+      rftable.refCounts[i] = 0;
+    } 
+  }       
 }
  
 // Increment ref count
@@ -83,14 +80,15 @@ void
 refincr(uint pa)
 {
   //cprintf("increasing refcount\n");
+
   acquire(&rftable.lock);
-  struct refcount *r;
+  int r;
   if(!(r = getRefCount(pa)))
   {
-    refcountalloc(pa); 
-    r = getRefCount(pa);
+    r =  refcountalloc(pa); 
+    
   }
-  r->count++;    
+  rftable.refCounts[r]++;   
   release(&rftable.lock);
   //cprintf("finished increasing refcount\n"); 
 }
@@ -100,13 +98,15 @@ void
 refdecr(uint pa)
 {
   //cprintf("decreasing refcount\n");
+  
   acquire(&rftable.lock);
-  struct refcount *r;
+  int r;
   if(!(r = getRefCount(pa)))
     panic("trying to decrement a page that isn't being counted\n");
-  r->count--;
+  rftable.refCounts[r]--;
  
-  if(r->count ==  0){
+  if(rftable.refCounts[r] < 1)
+	{
     kfree((void *) pa);
     remove(r);  
   }   
@@ -264,7 +264,7 @@ growproc(int n)
 int
 fork(void)
 {
-  cprintf("Proc: %d is forking\n", proc->pid);
+  
   int i, pid;
   struct proc *np;
 
@@ -273,26 +273,19 @@ fork(void)
     return -1;
 
   //cprintf("about to call shareuvm in fork\n");
-  // Copy process state from p.
-  /*
-  if(!(np->pgdir = copyuvm(proc->pgdir, proc->sz))){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->		proc->tf = tf;state = UNUSED;
-    return -1;
-  }
-  */
+  
   //Don't copy the page table. Instead mark pages as shared, then copy-on-write
   //cprintf("fork\n");
-	cprintf("free pages prefork: %d\n", sys_freepages());
+	//cprintf("free pages prefork: %d\n", sys_freepages());
   if(!(np->pgdir = shareuvm(proc->pgdir, proc->sz))){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
   }
-	cprintf("free pages postfork: %d\n", sys_freepages());
+	//cprintf("free pages postfork: %d\n", sys_freepages());
   //cprintf("got past shareuvm in fork\n");
+  
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
@@ -310,7 +303,7 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 	
 	lcr3(rcr3());
-  cprintf("proc: %d finished forking proc: %d\n", proc->pid, pid);
+  
   return pid;
 }
 
@@ -607,7 +600,7 @@ handlepagefault(struct proc* p)
 
     if(!mappages(p->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W|PTE_U))
       panic("no mapping");
-     
+    cprintf("calling refdecr on proc: %d pa: %d\n",proc->pid, pa);  
     refdecr(pa);
     char *a = PGROUNDDOWN((void *)rcr2());
     pte_t *newPTE = walkpgdir(p->pgdir, a, 1); 

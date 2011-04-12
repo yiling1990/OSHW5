@@ -266,11 +266,13 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   char *last = PGROUNDDOWN(oldsz - 1);
   for(; a <= last; a += PGSIZE){
     pte_t *pte = walkpgdir(pgdir, a, 0);
-    if(pte && (*pte & PTE_P) != 0){
+    if(pte && (*pte & PTE_P) != 0)
+		{
       uint pa = PTE_ADDR(*pte);
       if(pa == 0)
         panic("kfree");
-       // kfree((void *) pa);
+        //kfree((void *) pa);
+			refdecr(pa);
       *pte = 0;
     }
   }
@@ -286,10 +288,13 @@ freevm(pde_t *pgdir)
 
   if(!pgdir)
     panic("freevm: no pgdir");
-  deallocuvm(pgdir, USERTOP, 0);
+  //deallocuvm(pgdir, USERTOP, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P)
+		{
+			//refdecr(PTE_ADDR(pgdir[i]));
       kfree((void *) PTE_ADDR(pgdir[i]));
+		}
   }
   kfree((void *) pgdir);
 }
@@ -337,20 +342,20 @@ shareuvm(pde_t *pgdir, uint sz)
 
   if(!d) return 0;
   for(i = 0; i < sz; i += PGSIZE){
-    cprintf("in shareuvm loop\n");
+    
     if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
       panic("shareuvm: pte should exist\n");
     if(!(*pte & PTE_P))
       panic("shareuvm: page not present\n");
-    cprintf("made it to middle of shareuvm\n"); 
+     
     *pte = *pte & ~PTE_W;
 
     pa = PTE_ADDR(*pte);
     refincr(pa);
-    cprintf("made it past refincr");
+    
     if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_U))
       goto bad;
-    cprintf("finished shareuvm loop");
+    
   }
   return d;
 

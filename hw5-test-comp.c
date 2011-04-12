@@ -9,28 +9,35 @@
 
 char *usertests_argv[] = {"usertests", 0};
 
-int main() {
-  int p[2];
+int main() 
+{
+	
+  //int p[2];
   int child;
   char buf[MAX_BUF_SIZE];
   int succeed = 0;
 
-  if (pipe(p) < 0)
-    panic("pipe failed");
+  //if (pipe(p) < 0)
+   // panic("pipe failed");
 
   child = fork();
-  if (child == 0) {
+  if (child == 0) 
+	{
+		/*
     close(stdout);
     dup(p[1]);
     close(p[0]);
     close(p[1]);
+		*/
     exec(usertests_argv[0], usertests_argv);
     panic("exec failed");
   }
+	/*
   close(stdin);
   dup(p[0]);
   close(p[0]);
   close(p[1]);
+	*/
 
   for (;;) {
     gets(buf, MAX_BUF_SIZE);
