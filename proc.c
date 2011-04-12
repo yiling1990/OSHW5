@@ -32,7 +32,7 @@ refcountinit(void)
 void 
 refcountalloc(uint pa)
 {
-  cprintf("calling refcount alloc\n");
+  //cprintf("calling refcount alloc\n");
   struct refcount *r= (struct refcount*)kalloc();
   r->pa = pa;
   r->count = 1;
@@ -47,12 +47,13 @@ refcountalloc(uint pa)
   }
   else
     rftable.first = r;
-  cprintf("finsihed allocing refcount\n");
+  //cprintf("finished allocing refcount\n");
 }
 
 // Get refcount for pa
 struct refcount *
-getRefCount(uint pa ){
+getRefCount(uint pa)
+{
   struct refcount *current = rftable.first;
   while(current != (void *)0 && current->pa != pa)
     current = current->next;
@@ -81,7 +82,7 @@ remove(struct refcount *r){
 void
 refincr(uint pa)
 {
-  cprintf("increasing refcount\n");
+  //cprintf("increasing refcount\n");
   acquire(&rftable.lock);
   struct refcount *r;
   if(!(r = getRefCount(pa)))
@@ -91,14 +92,14 @@ refincr(uint pa)
   }
   r->count++;    
   release(&rftable.lock);
-  cprintf("finished increasing refcount\n"); 
+  //cprintf("finished increasing refcount\n"); 
 }
 
 // Decrement ref count;
 void
 refdecr(uint pa)
 {
-  cprintf("decreasing refcount\n");
+  //cprintf("decreasing refcount\n");
   acquire(&rftable.lock);
   struct refcount *r;
   if(!(r = getRefCount(pa)))
@@ -110,7 +111,7 @@ refdecr(uint pa)
     remove(r);  
   }   
   release(&rftable.lock);
-  cprintf("finished decreasing refcount");
+  //cprintf("finished decreasing refcount");
 }      
 
 static struct proc *initproc;
@@ -271,7 +272,7 @@ fork(void)
   if((np = allocproc()) == 0)
     return -1;
 
-  cprintf("about to call shareuvm in fork\n");
+  //cprintf("about to call shareuvm in fork\n");
   // Copy process state from p.
   /*
   if(!(np->pgdir = copyuvm(proc->pgdir, proc->sz))){
@@ -283,13 +284,15 @@ fork(void)
   */
   //Don't copy the page table. Instead mark pages as shared, then copy-on-write
   //cprintf("fork\n");
+	cprintf("free pages prefork: %d\n", sys_freepages());
   if(!(np->pgdir = shareuvm(proc->pgdir, proc->sz))){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
   }
-  cprintf("got past shareuvm in fork\n");
+	cprintf("free pages postfork: %d\n", sys_freepages());
+  //cprintf("got past shareuvm in fork\n");
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
