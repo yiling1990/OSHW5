@@ -317,7 +317,7 @@ exitwait(void)
   for(i = 0; i < 100; i++){
     pid = fork();
     if(pid < 0){
-      printf(1, "fork failed\n");
+      printf(1, "fork failed exitwait\n");
       return;
     }
     if(pid){
@@ -349,6 +349,7 @@ mem(void)
     while(m1) {
       m2 = *(char**)m1;
       free(m1);
+      printf(1, "freeing m1");
       m1 = m2;
     }
     m1 = malloc(1024*20);
@@ -431,7 +432,7 @@ twofiles(void)
 
   pid = fork();
   if(pid < 0){
-    printf(1, "fork failed\n");
+    printf(1, "fork failed twofiles\n");
     return;
   }
 
@@ -491,7 +492,7 @@ createdelete(void)
   printf(1, "createdelete test\n");
   pid = fork();
   if(pid < 0){
-    printf(1, "fork failed\n");
+    printf(1, "fork failed create delete\n");
     exit();
   }
 
@@ -734,7 +735,7 @@ concreate(void)
     file[1] = '0' + i;
     pid = fork();
     if(pid < 0){
-      printf(1, "fork failed\n");
+      printf(1, "fork failed concreate\n");
       exit();
     }
     if(((i % 3) == 0 && pid == 0) ||
@@ -1337,7 +1338,7 @@ sbrktest(void)
     int ppid = getpid();
     int pid = fork();
     if(pid < 0){
-      printf(stdout, "fork failed\n");
+      printf(stdout, "fork failed sbrk\n");
       exit();
     }
     if(pid == 0){
@@ -1444,9 +1445,9 @@ main(int argc, char *argv[])
   close(open("usertests.ran", O_CREATE));
 
   sbrktest();
-  //validatetest();
+  validatetest();
 
- 	opentest();
+  opentest();
   writetest();
   writetest1();
   createtest();

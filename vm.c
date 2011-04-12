@@ -271,8 +271,8 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       uint pa = PTE_ADDR(*pte);
       if(pa == 0)
         panic("kfree");
-      kfree((void *) pa);
-			refdecr(pa);
+      //kfree((void *) pa);
+      refdecr(pa);
       *pte = 0;
     }
   }
@@ -288,13 +288,13 @@ freevm(pde_t *pgdir)
 
   if(!pgdir)
     panic("freevm: no pgdir");
-  //deallocuvm(pgdir, USERTOP, 0);
+  deallocuvm(pgdir, USERTOP, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P)
-		{
-			//refdecr(PTE_ADDR(pgdir[i]));
-     	//kfree((void *) PTE_ADDR(pgdir[i]));
-		}
+    {
+      refdecr(PTE_ADDR(pgdir[i]));
+      //kfree((void *) PTE_ADDR(pgdir[i]));
+    }
   }
  	kfree((void *) pgdir);
 }

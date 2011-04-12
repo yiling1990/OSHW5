@@ -101,18 +101,24 @@ refdecr(uint pa)
   
   acquire(&rftable.lock);
   int r;
-  if(!(r = getRefCount(pa)))
-    //panic("trying to decrement a page that isn't being counted\n");
-  rftable.refCounts[r]--;
+  if(!(r = getRefCount(pa))){
+    cprintf("freeing non-shared page\n");
+    kfree((void *)pa);
+  }
+  else{  
+    rftable.refCounts[r]--;
  
-  if(rftable.refCounts[r] < 1)
-	{
-    remove(r);  
-    kfree((void *) pa);
-  }   
-  release(&rftable.lock);
+    if(rftable.refCounts[r] < 1)
+    {
+      cprintf("freeing previously shared page\n");
+      remove(r);  
+      kfree((void *) pa);
+    }   
+
   //cprintf("finished decreasing refcount");
-}      
+  }        
+  release(&rftable.lock);
+}
 
 static struct proc *initproc;
 
@@ -372,7 +378,7 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        //freevm(p->pgdir);
+        freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
 
