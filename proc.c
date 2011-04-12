@@ -11,6 +11,98 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
+struct refcount {
+  pte_t *pte;
+  int count;
+  struct refcount *next;
+};
+
+struct {
+  struct spinlock lock;
+  struct refcount *first;
+} rftable;
+
+void
+refcountinit(void)
+{
+  initlock(&rftable.lock, "rftable");
+}
+
+//Allocate a refcount structure
+void 
+refcountalloc(pte_t *pte)
+{
+  cprintf("calling refcount alloc\n");
+  struct refcount *r= (struct refcount*)kalloc();
+  r->pte = pte;
+  r->count = 1;
+  r->next = (void *)0;
+ 
+  acquire(&rftable.lock);
+  struct refcount *current = rftable.first;
+  while(current->next != (void *)0) 
+    current = current->next;
+  current->next = r;   
+  release(&rftable.lock);
+  cprintf("finsihed allocing refcount\n");
+}
+
+// Get refcount for pte
+struct refcount *
+getRefCount(pte_t * pte){
+  struct refcount *current = rftable.first;
+  while(current != (void *)0 && current->pte != pte)
+    current = current->next;
+  if(current == (void *)0)
+    panic("that page does not exist");
+  return current; 
+}
+
+// remove refcount from list
+void
+remove(struct refcount *r){
+  struct refcount *current = rftable.first;
+  struct refcount *prev = (void *)0;
+  while(current != r){
+    prev = current;
+    current = current->next;
+  }
+  if(prev == (void *)0)
+    rftable.first = current->next;
+  else
+    prev->next = current->next;  
+  kfree((void *)current);
+}
+ 
+// Increment ref count
+void
+refincr(pte_t *pte)
+{
+  cprintf("increasing refcount\n");
+  acquire(&rftable.lock);
+  struct refcount *r = getRefCount(pte);
+  r->count++;    
+  release(&rftable.lock);
+  cprintf("finished increasing refcount\n"); 
+}
+
+// Decrement ref count;
+void
+refdecr(pte_t *pte)
+{
+  cprintf("decreasing refcount\n");
+  acquire(&rftable.lock);
+  struct refcount *r = getRefCount(pte);
+  r->count--;
+  if(r->count ==  0){
+    uint pa = PTE_ADDR(*pte);
+    kfree((void *) pa);
+    remove(r);  
+  }   
+  release(&rftable.lock);
+  cprintf("finished decreasing refcount");
+}      
+
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -113,7 +205,8 @@ userinit(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
-  
+ 
+  refcountinit();
   p = allocproc();
   initproc = p;
   if(!(p->pgdir = setupkvm()))
@@ -160,6 +253,7 @@ growproc(int n)
 int
 fork(void)
 {
+  cprintf("Proc: %d is forking\n", proc->pid);
   int i, pid;
   struct proc *np;
 
@@ -167,6 +261,7 @@ fork(void)
   if((np = allocproc()) == 0)
     return -1;
 
+  cprintf("about to call shareuvm in fork\n");
   // Copy process state from p.
   /*
   if(!(np->pgdir = copyuvm(proc->pgdir, proc->sz))){
@@ -184,7 +279,7 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
-  
+  cprintf("got past shareuvm in fork\n");
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
@@ -202,7 +297,7 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 	
 	lcr3(rcr3());
-
+  cprintf("proc: %d finished forking proc: %d\n", proc->pid, pid);
   return pid;
 }
 
@@ -499,7 +594,11 @@ handlepagefault(struct proc* p)
 
     if(!mappages(p->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W|PTE_U))
       panic("no mapping");
-    
+     
+    refdecr(pte);
+    char *a = PGROUNDDOWN((void *)rcr2());
+    pte_t *newPTE = walkpgdir(p->pgdir, a, 1); 
+    refcountalloc(newPTE);
     return p;
  }
 
