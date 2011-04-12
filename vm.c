@@ -344,8 +344,9 @@ shareuvm(pde_t *pgdir, uint sz)
       panic("shareuvm: page not present\n");
     cprintf("made it to middle of shareuvm\n"); 
     *pte = *pte & ~PTE_W;
-    refincr(pte); 
+
     pa = PTE_ADDR(*pte);
+    refincr(pa);
     cprintf("made it past refincr");
     if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_U))
       goto bad;
