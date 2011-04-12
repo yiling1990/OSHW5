@@ -337,20 +337,20 @@ shareuvm(pde_t *pgdir, uint sz)
 
   if(!d) return 0;
   for(i = 0; i < sz; i += PGSIZE){
-    cprintf("in shareuvm loop\n");
+    
     if(!(pte = walkpgdir(pgdir, (void *)i, 0)))
       panic("shareuvm: pte should exist\n");
     if(!(*pte & PTE_P))
       panic("shareuvm: page not present\n");
-    cprintf("made it to middle of shareuvm\n"); 
+     
     *pte = *pte & ~PTE_W;
 
     pa = PTE_ADDR(*pte);
     refincr(pa);
-    cprintf("made it past refincr");
+    
     if(!mappages(d, (void *)i, PGSIZE, PADDR(pa), PTE_U))
       goto bad;
-    cprintf("finished shareuvm loop");
+    
   }
   return d;
 

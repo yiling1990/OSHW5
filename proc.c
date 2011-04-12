@@ -11,106 +11,93 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
-struct refcount {
-  uint pa;
-  int count;
-  struct refcount *next;
-};
 
 struct {
   struct spinlock lock;
-  struct refcount *first;
+  uint paList[256];
+  uint refCounts[256]; 
 } rftable;
 
 void
 refcountinit(void)
 {
-  initlock(&rftable.lock, "rftable");
+   initlock(&rftable.lock, "rftable");
 }
 
 //Allocate a refcount structure
-void 
+uint
 refcountalloc(uint pa)
 {
-  cprintf("calling refcount alloc\n");
-  struct refcount *r= (struct refcount*)kalloc();
-  r->pa = pa;
-  r->count = 1;
-  r->next = (void *)0;
- 
-  if(rftable.first != (void *)0)
-  {
-    struct refcount *current = rftable.first;
-    while(current->next != (void *)0) 
-     current = current->next;
-    current->next = r;   
+  int i; 
+  for(i=0; i<256; i++){
+    if(rftable.paList[i] == 0){
+      rftable.paList[i] = pa;
+      rftable.refCounts[i] = 1;
+      return i; 
+    }
   }
-  else
-    rftable.first = r;
-  cprintf("finsihed allocing refcount\n");
+  panic("array is full");
 }
 
 // Get refcount for pa
-struct refcount *
+uint
 getRefCount(uint pa ){
-  struct refcount *current = rftable.first;
-  while(current != (void *)0 && current->pa != pa)
-    current = current->next;
-  if(current == (void *)0)
-    return 0;    
- return current; 
+  int i;
+  for(i=0; i<rftable.paList[256];i++){
+    if(rftable.paList[i] == pa)
+      return i;
+  }  
+return 0;
 }
+
 
 // remove refcount from list
 void
-remove(struct refcount *r){
-  struct refcount *current = rftable.first;
-  struct refcount *prev = (void *)0;
-  while(current != r){
-    prev = current;
-    current = current->next;
-  }
-  if(prev == (void *)0)
-    rftable.first = current->next;
-  else
-    prev->next = current->next;  
-  kfree((void *)current);
+remove(uint pa){
+  int i;
+  for(i=0; i<rftable.paList[256];i++){
+    if(rftable.paList[i] == pa)
+    { 
+      rftable.paList[i] = 0;
+      rftable.refCounts[i] = 0;
+    } 
+  }       
 }
  
 // Increment ref count
 void
 refincr(uint pa)
 {
-  cprintf("increasing refcount\n");
+
   acquire(&rftable.lock);
-  struct refcount *r;
+  int r;
   if(!(r = getRefCount(pa)))
   {
-    refcountalloc(pa); 
-    r = getRefCount(pa);
+    r =  refcountalloc(pa); 
+    
   }
-  r->count++;    
+  rftable.refCounts[r]++;   
   release(&rftable.lock);
-  cprintf("finished increasing refcount\n"); 
+   
 }
 
 // Decrement ref count;
 void
 refdecr(uint pa)
 {
-  cprintf("decreasing refcount\n");
+  
   acquire(&rftable.lock);
-  struct refcount *r;
+  int r;
   if(!(r = getRefCount(pa)))
     panic("trying to decrement a page that isn't being counted\n");
-  r->count--;
+  rftable.refCounts[r]--;
  
-  if(r->count ==  0){
+  if(rftable.refCounts[r] ==  0){
     kfree((void *) pa);
     remove(r);  
   }   
   release(&rftable.lock);
-  cprintf("finished decreasing refcount");
+  
 }      
 
 static struct proc *initproc;
@@ -263,7 +250,7 @@ growproc(int n)
 int
 fork(void)
 {
-  cprintf("Proc: %d is forking\n", proc->pid);
+  
   int i, pid;
   struct proc *np;
 
@@ -289,7 +276,7 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
-  cprintf("got past shareuvm in fork\n");
+  
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
@@ -307,7 +294,7 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 	
 	lcr3(rcr3());
-  cprintf("proc: %d finished forking proc: %d\n", proc->pid, pid);
+  
   return pid;
 }
 
@@ -604,7 +591,7 @@ handlepagefault(struct proc* p)
 
     if(!mappages(p->pgdir, (void *)rcr2(), PGSIZE, PADDR(mem), PTE_W|PTE_U))
       panic("no mapping");
-     
+    cprintf("calling refdecr on proc: %d pa: %d\n",proc->pid, pa);  
     refdecr(pa);
     char *a = PGROUNDDOWN((void *)rcr2());
     pte_t *newPTE = walkpgdir(p->pgdir, a, 1); 
