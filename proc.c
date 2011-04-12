@@ -38,12 +38,15 @@ refcountalloc(pte_t *pte)
   r->count = 1;
   r->next = (void *)0;
  
-  acquire(&rftable.lock);
-  struct refcount *current = rftable.first;
-  while(current->next != (void *)0) 
-    current = current->next;
-  current->next = r;   
-  release(&rftable.lock);
+  if(rftable.first != (void *)0)
+  {
+    struct refcount *current = rftable.first;
+    while(current->next != (void *)0) 
+     current = current->next;
+    current->next = r;   
+  }
+  else
+    rftable.first = r;
   cprintf("finsihed allocing refcount\n");
 }
 
@@ -54,8 +57,8 @@ getRefCount(pte_t * pte){
   while(current != (void *)0 && current->pte != pte)
     current = current->next;
   if(current == (void *)0)
-    panic("that page does not exist");
-  return current; 
+    return 0;    
+ return current; 
 }
 
 // remove refcount from list
@@ -80,7 +83,12 @@ refincr(pte_t *pte)
 {
   cprintf("increasing refcount\n");
   acquire(&rftable.lock);
-  struct refcount *r = getRefCount(pte);
+  struct refcount *r;
+  if(!(r = getRefCount(pte)))
+  {
+    refcountalloc(pte); 
+    r = getRefCount(pte);
+  }
   r->count++;    
   release(&rftable.lock);
   cprintf("finished increasing refcount\n"); 
@@ -92,7 +100,9 @@ refdecr(pte_t *pte)
 {
   cprintf("decreasing refcount\n");
   acquire(&rftable.lock);
-  struct refcount *r = getRefCount(pte);
+  struct refcount *r;
+  if(!(r = getRefCount(pte)))
+    panic("trying to decrement a page that isn't being counted\n");
   r->count--;
   if(r->count ==  0){
     uint pa = PTE_ADDR(*pte);
@@ -598,7 +608,7 @@ handlepagefault(struct proc* p)
     refdecr(pte);
     char *a = PGROUNDDOWN((void *)rcr2());
     pte_t *newPTE = walkpgdir(p->pgdir, a, 1); 
-    refcountalloc(newPTE);
+    refincr(newPTE);
     return p;
  }
 
