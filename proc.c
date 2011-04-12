@@ -102,13 +102,13 @@ refdecr(uint pa)
   acquire(&rftable.lock);
   int r;
   if(!(r = getRefCount(pa)))
-    panic("trying to decrement a page that isn't being counted\n");
+    //panic("trying to decrement a page that isn't being counted\n");
   rftable.refCounts[r]--;
  
   if(rftable.refCounts[r] < 1)
 	{
-    kfree((void *) pa);
     remove(r);  
+    kfree((void *) pa);
   }   
   release(&rftable.lock);
   //cprintf("finished decreasing refcount");
@@ -366,12 +366,13 @@ wait(void)
       if(p->parent != proc)
         continue;
       havekids = 1;
-      if(p->state == ZOMBIE){
+      if(p->state == ZOMBIE)
+			{
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
+        //freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
 

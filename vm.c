@@ -271,7 +271,7 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       uint pa = PTE_ADDR(*pte);
       if(pa == 0)
         panic("kfree");
-        //kfree((void *) pa);
+      kfree((void *) pa);
 			refdecr(pa);
       *pte = 0;
     }
@@ -293,10 +293,10 @@ freevm(pde_t *pgdir)
     if(pgdir[i] & PTE_P)
 		{
 			//refdecr(PTE_ADDR(pgdir[i]));
-      kfree((void *) PTE_ADDR(pgdir[i]));
+     	//kfree((void *) PTE_ADDR(pgdir[i]));
 		}
   }
-  kfree((void *) pgdir);
+ 	kfree((void *) pgdir);
 }
 
 // Given a parent process's page table, create a copy

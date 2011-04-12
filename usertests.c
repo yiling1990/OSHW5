@@ -144,18 +144,30 @@ createtest(void)
 {
   int i, fd;
 
+	printf(stdout, "before\n");
   printf(stdout, "many creates, followed by unlink test\n");
+	printf(stdout, "after\n");
 
   name[0] = 'a';
+	printf(stdout, "after\n");
   name[2] = '\0';
-  for(i = 0; i < 52; i++) {
+	printf(stdout, "after\n");
+  for(i = 0; i < 52; i++) 
+	{
+		printf(stdout, "hi%d\n", i);
     name[1] = '0' + i;
     fd = open(name, O_CREATE|O_RDWR);
     close(fd);
   }
+
+	printf(stdout, "hello1\n");
   name[0] = 'a';
   name[2] = '\0';
-  for(i = 0; i < 52; i++) {
+
+	printf(stdout, "hello2\n");
+  for(i = 0; i < 52; i++) 
+	{
+		printf(stdout, "hello3\n");
     name[1] = '0' + i;
     unlink(name);
   }
@@ -1307,7 +1319,8 @@ sbrktest(void)
     printf(stdout, "sbrk re-allocation failed, a %x c %x\n", a, c);
     exit();
   }
-  if(*lastaddr == 99){
+  if(*lastaddr == 99)
+	{
     // should be zero
     printf(stdout, "sbrk de-allocation didn't really deallocate\n");
     exit();
@@ -1431,9 +1444,9 @@ main(int argc, char *argv[])
   close(open("usertests.ran", O_CREATE));
 
   sbrktest();
-  validatetest();
+  //validatetest();
 
-  opentest();
+ 	opentest();
   writetest();
   writetest1();
   createtest();
