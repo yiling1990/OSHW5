@@ -1267,6 +1267,7 @@ sbrktest(void)
     *b = 1;
     a = b + 1;
   }
+  printf(stdout,"about to sbrk fork test\n");
   pid = fork();
   if(pid < 0){
     printf(stdout, "sbrk test fork failed\n");
@@ -1281,7 +1282,8 @@ sbrktest(void)
   if(pid == 0)
     exit();
   wait();
-
+  
+  printf(stdout,"passed sbrk fork\n");
   // can one allocate the full 640K?
   a = sbrk(0);
   uint amt = (640 * 1024) - (uint) a;
@@ -1326,15 +1328,16 @@ sbrktest(void)
     printf(stdout, "sbrk de-allocation didn't really deallocate\n");
     exit();
   }
-
+  printf(stdout,"sbrk passed dealloc\n");
   c = sbrk(4096);
   if(c != (char *) 0xffffffff){
     printf(stdout, "sbrk was able to re-allocate beyond 640K, c %x\n", c);
     exit();
   }
-
+  printf(stdout,"sbrk passed realloc\n");
   // can we read the kernel's memory?
   for(a = (char*)(640*1024); a < (char *)2000000; a += 50000){
+    printf(stdout,"in for loop: %d", a);
     int ppid = getpid();
     int pid = fork();
     if(pid < 0){
@@ -1348,7 +1351,8 @@ sbrktest(void)
     }
     wait();
   }
-
+  printf(stdout,"sbrk passed read kernel memory\n");
+  
   // if we run the system out of memory, does it clean up the last
   // failed allocation?
   sbrk(-(sbrk(0) - oldbrk));
@@ -1358,6 +1362,7 @@ sbrktest(void)
     printf(1, "pipe() failed\n");
     exit();
   }
+  printf(stdout,"made it here 1\n");
   for(i = 0; i < sizeof(pids)/sizeof(pids[0]); i++){
     if((pids[i] = fork()) == 0) {
       // allocate the full 640K
@@ -1370,6 +1375,7 @@ sbrktest(void)
     if(pids[i] != -1)
       read(fds[0], &scratch, 1);
   }
+  printf(stdout,"made it past the bunch of allocations\n");
   // if those failed allocations freed up the pages they did allocate,
   // we'll be able to allocate here
   c = sbrk(4096);
@@ -1379,11 +1385,12 @@ sbrktest(void)
     kill(pids[i]);
     wait();
   }
+  printf(stdout,"made it past allocation test\n");
   if(c == (char*)0xffffffff) {
     printf(stdout, "failed sbrk leaked memory\n");
     exit();
   }
-
+  printf(stdout,"sbrk past memory leak test\n");
   if(sbrk(0) > oldbrk)
     sbrk(-(sbrk(0) - oldbrk));
 

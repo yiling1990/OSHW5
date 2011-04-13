@@ -288,12 +288,12 @@ freevm(pde_t *pgdir)
 
   if(!pgdir)
     panic("freevm: no pgdir");
-  deallocuvm(pgdir, USERTOP, 0);
+ // deallocuvm(pgdir, USERTOP, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P)
     {
-      refdecr(PTE_ADDR(pgdir[i]));
-      //kfree((void *) PTE_ADDR(pgdir[i]));
+      //refdecr(PTE_ADDR(pgdir[i]));
+      kfree((void *) PTE_ADDR(pgdir[i]));
     }
   }
  	kfree((void *) pgdir);

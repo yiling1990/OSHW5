@@ -102,7 +102,7 @@ refdecr(uint pa)
   acquire(&rftable.lock);
   int r;
   if(!(r = getRefCount(pa))){
-    cprintf("freeing non-shared page\n");
+   // cprintf("freeing non-shared page\n");
     kfree((void *)pa);
   }
   else{  
@@ -110,7 +110,7 @@ refdecr(uint pa)
  
     if(rftable.refCounts[r] < 1)
     {
-      cprintf("freeing previously shared page\n");
+     // cprintf("freeing previously shared page\n");
       remove(r);  
       kfree((void *) pa);
     }   
@@ -361,6 +361,7 @@ exit(void)
 int
 wait(void)
 {
+  cprintf("starting wait");
   struct proc *p;
   int havekids, pid;
 
@@ -378,14 +379,18 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
+        cprintf("calling freevm in wait");
         freevm(p->pgdir);
+        cprintf("passed freevm in wait");
         p->state = UNUSED;
         p->pid = 0;
 
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        cprintf("releasing ptable lock\n");
         release(&ptable.lock);
+        cprintf("returning pid and exiting wait\n");
         return pid;
       }
     }
@@ -395,9 +400,10 @@ wait(void)
       release(&ptable.lock);
       return -1;
     }
-
+    cprintf("waiting for children to exit\n");
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(proc, &ptable.lock);  //DOC: wait-sleep
+    cprintf("leaving wait");
   }
 }
 
